@@ -2746,71 +2746,35 @@ def get_servix_fx_data() -> dict:
 
 
 
-    if not isinstance(data, list):
-
-        raise RuntimeError(
-
-            f"Invalid Servix response: {data}"
-
-        )
-
-
-
+   
     result = {}
 
+    if isinstance(data, dict):
+        code = data.get("code")
+        value = data.get("value")
 
+        if code and value is not None:
+            result[code.upper()] = _to_float(value, code)
 
-    for item in data:
+    elif isinstance(data, list):
+        for item in data:
+            if not isinstance(item, dict):
+                continue
 
+            code = item.get("code")
+            value = item.get("value")
 
+            if code and value is not None:
+                result[code.upper()] = _to_float(value, code)
 
-        if not isinstance(item, dict):
-
-            continue
-
-
-
-        code = item.get("code")
-
-
-
-        if not code:
-
-            continue
-
-
-
-        value = item.get("value")
-
-
-
-        if value is None:
-
-            continue
-
-
-
-        result[code.upper()] = _to_float(
-
-            value,
-
-            code
-
-        )
-
-
+    else:
+        raise RuntimeError(f"Invalid Servix response: {data}")
 
     if not result:
-
-        raise RuntimeError(
-
-            "Servix returned no FX prices."
-
-        )
-
-
+        raise RuntimeError("Servix returned no FX prices.")
 
     return result
+
 
 
 
