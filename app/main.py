@@ -1,6 +1,7 @@
 import asyncio
 
 from fastapi import FastAPI
+from app.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.models import (
@@ -86,10 +87,19 @@ app.include_router(prices.router)
 # ============================================================
 @app.on_event("startup")
 async def startup_event():
+    # ساخت جدول‌های دیتابیس در صورت نبودن
+    await asyncio.to_thread(
+        Base.metadata.create_all,
+        bind=engine
+    )
+
+    # شروع به‌روزرسانی قیمت‌های بازار
     asyncio.create_task(
         update_market_prices(),
         name="market-updater"
     )
+
+    # شروع به‌روزرسانی پورتفولیو
     start_portfolio_snapshot_updater()
 # ============================================================
 # Root
