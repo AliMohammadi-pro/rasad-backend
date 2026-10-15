@@ -15,6 +15,7 @@ from app.models.transaction import Transaction
 from app.models.alert import Alert
 from app.models.withdrawal import Withdrawal
 from app.models.push_token import PushToken
+from app.models.feedback import Feedback
 from app.models.push_token import PushToken
 
 
@@ -33,5 +34,6 @@ __all__ = [
     "EconomicCalendar",
     "EconomicIndicator",
     "Alert",
-    "Withdrawal"
+    "Withdrawal",
+    "Feedback"
 ]

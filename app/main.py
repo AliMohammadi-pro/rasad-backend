@@ -1,10 +1,7 @@
-
 import asyncio
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-from app.database import Base, engine
 
 from app.models import (
     User,
@@ -22,6 +19,7 @@ from app.models import (
     Alert,
     Withdrawal,
     PushToken,
+    Feedback
 )
 
 from app.routers import auth
@@ -34,10 +32,11 @@ from app.routers import trading
 from app.routers import watchlist
 from app.routers import market
 from app.routers import prices
+from app.routers import feedback
 
 from app.services.market_updater import update_market_prices
 from app.services.portfolio_snapshot_updater import (
-    start_portfolio_snapshot_updater,
+    start_portfolio_snapshot_updater
 )
 
 
@@ -47,8 +46,8 @@ from app.services.portfolio_snapshot_updater import (
 
 app = FastAPI(
     title="Crypto Market API",
-    description="Backend API for Rasad",
-    version="1.0.0",
+    description="Backend API for Crypto Market Simulator",
+    version="1.0.0"
 )
 
 
@@ -59,13 +58,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        # Local frontend development
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-
-        # Android WebView (if using these origins)
-        "https://localhost",
-        "http://localhost",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -87,30 +81,19 @@ app.include_router(watchlist.router)
 app.include_router(user.router)
 app.include_router(market.router)
 app.include_router(prices.router)
+app.include_router(feedback.router)
 
 
 # ============================================================
 # Startup
 # ============================================================
-
 @app.on_event("startup")
 async def startup_event():
-    # Create database tables if they do not exist
-    await asyncio.to_thread(
-        Base.metadata.create_all,
-        bind=engine,
-    )
-
-    # Start market price updater
     asyncio.create_task(
         update_market_prices(),
-        name="market-updater",
+        name="market-updater"
     )
-
-    # Start portfolio snapshot updater
     start_portfolio_snapshot_updater()
-
-
 # ============================================================
 # Root
 # ============================================================
@@ -118,8 +101,8 @@ async def startup_event():
 @app.get("/")
 def root():
     return {
-        "message": "Rasad API is running",
-        "status": "ok",
+        "message": "Crypto Market API is running",
+        "status": "ok"
     }
 
 
@@ -130,7 +113,7 @@ def root():
 @app.get("/api/health")
 def health():
     return {
-        "status": "healthy",
+        "status": "healthy"
     }
 
 
@@ -142,5 +125,5 @@ def health():
 def database_status():
     return {
         "status": "connected",
-        "database": "crypto_market",
+        "database": "crypto_market"
     }

@@ -48,31 +48,66 @@ def _get_firebase_credentials_path() -> Path:
 def _initialize_firebase():
     """
     Firebase Admin SDK را فقط یک بار initialize می‌کند.
+
+    روی هاست می‌توان کل JSON سرویس‌اکانت را در متغیر
+    FIREBASE_SERVICE_ACCOUNT_JSON قرار داد؛ در غیر این صورت
+    فایل مسیر FIREBASE_CREDENTIALS_PATH خوانده می‌شود.
     """
 
-    if firebase_admin._apps:
+    try:
         return firebase_admin.get_app()
+    except ValueError:
+        pass
 
-    credentials_path = _get_firebase_credentials_path()
+    service_account_json = os.getenv(
+        "FIREBASE_SERVICE_ACCOUNT_JSON",
+        ""
+    ).strip()
 
-    if not credentials_path.exists():
-        raise FileNotFoundError(
-            "Firebase service account file not found: "
-            f"{credentials_path}"
+    if service_account_json:
+        try:
+            service_account_data = json.loads(
+                service_account_json
+            )
+        except json.JSONDecodeError as error:
+            raise ValueError(
+                "FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON"
+            ) from error
+
+        cred = credentials.Certificate(
+            service_account_data
+        )
+    else:
+        credentials_path = _get_firebase_credentials_path()
+
+        if not credentials_path.exists():
+            raise FileNotFoundError(
+                "Firebase service account is not configured. "
+                "Set FIREBASE_SERVICE_ACCOUNT_JSON on the host "
+                "or provide FIREBASE_CREDENTIALS_PATH."
+            )
+
+        cred = credentials.Certificate(
+            str(credentials_path)
         )
 
-    cred = credentials.Certificate(
-        str(credentials_path)
-    )
-
-    return firebase_admin.initialize_app(
-        cred
-    )
+    return firebase_admin.initialize_app(cred)
 
 
 # ==================================================
 # FCM
 # ==================================================
+
+def get_user_push_token_count(user_id: int) -> int:
+    """تعداد دستگاه‌های دارای توکن ثبت‌شده برای یک کاربر."""
+    db = SessionLocal()
+    try:
+        return len(db.execute(
+            select(PushToken).where(PushToken.user_id == user_id)
+        ).scalars().all())
+    finally:
+        db.close()
+
 
 def send_fcm_notification(
     user_id: int,

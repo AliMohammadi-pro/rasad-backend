@@ -15,31 +15,28 @@ def register_push_token(
 ) -> PushToken:
 
     token = token.strip()
+    platform = (platform or "android").strip()[:50] or "android"
 
     if not token:
         raise ValueError("FCM token cannot be empty")
 
-    # بررسی اینکه این Token قبلاً برای همین کاربر ثبت شده یا نه
+    # FCM tokens are globally unique. If this device was previously
+    # used by another account, attach the token to the current account.
     result = db.execute(
-        select(PushToken)
-        .where(
-            PushToken.user_id == user.id,
+        select(PushToken).where(
             PushToken.token == token
         )
     )
-
     push_token = result.scalar_one_or_none()
 
     if push_token:
+        push_token.user_id = user.id
         push_token.platform = platform
         push_token.updated_at = datetime.utcnow()
-
         db.commit()
         db.refresh(push_token)
-
         return push_token
 
-    # اگر Token جدید است
     push_token = PushToken(
         user_id=user.id,
         token=token,
@@ -49,7 +46,6 @@ def register_push_token(
     db.add(push_token)
     db.commit()
     db.refresh(push_token)
-
     return push_token
 
 

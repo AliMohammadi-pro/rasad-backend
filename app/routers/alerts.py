@@ -20,9 +20,8 @@ from app.models.asset import Asset
 from app.utils.auth import get_current_user
 
 from app.services.notification_service import (
-    get_user_topic,
-    get_user_topic_url,
-    send_ntfy_notification,
+    get_user_push_token_count,
+    send_fcm_notification,
 )
 
 from app.services.push_token_service import (
@@ -233,27 +232,28 @@ def notification_setup(
         get_current_user
     )
 ):
-
-    topic = get_user_topic(
+    token_count = get_user_push_token_count(
         current_user.id
     )
 
     return {
-        "enabled": True,
-        "provider": "ntfy",
-        "topic": topic,
-        "subscribe_url": get_user_topic_url(
-            current_user.id
-        ),
+        "enabled": token_count > 0,
+        "provider": "firebase",
+        "registered_devices": token_count,
         "message": (
-            "Subscribe to this topic in ntfy "
-            "to receive Rasad alerts."
+            "اعلان Firebase آماده است."
+            if token_count > 0
+            else (
+                "توکن این دستگاه ثبت نشده است. "
+                "در اپ اندروید یک بار خارج شوید و دوباره وارد شوید "
+                "و اجازه اعلان‌ها را فعال کنید."
+            )
         ),
     }
 
 
 # ==================================================
-# Notification Test
+# Notification Test (Firebase Cloud Messaging)
 # ==================================================
 
 @router.post("/notifications/test")
@@ -262,27 +262,45 @@ def test_notification(
         get_current_user
     )
 ):
-
-    sent = send_ntfy_notification(
+    sent = send_fcm_notification(
         user_id=current_user.id,
         title="🔔 تست اعلان رصد",
         message=(
             "اگر این پیام را دریافت کردی، "
-            "اتصال اعلان‌های رصد به ntfy درست است."
+            "ارسال اعلان‌های Firebase رصد درست کار می‌کند."
         ),
         priority="high",
-        tags=["bell", "test_tube"],
+        data={
+            "type": "test",
+            "source": "rasad",
+        },
     )
 
     if not sent:
+        token_count = get_user_push_token_count(
+            current_user.id
+        )
+        if token_count == 0:
+            detail = (
+                "برای این حساب هیچ توکن FCM ثبت نشده است. "
+                "برنامه اندروید را باز کنید، اجازه اعلان را بدهید "
+                "و دوباره وارد شوید."
+            )
+        else:
+            detail = (
+                "Firebase نتوانست اعلان را ارسال کند. "
+                "تنظیم FIREBASE_SERVICE_ACCOUNT_JSON یا "
+                "FIREBASE_CREDENTIALS_PATH و لاگ‌های سرور را بررسی کنید."
+            )
 
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Could not send notification through ntfy"
+            detail=detail
         )
 
     return {
-        "message": "Test notification sent successfully"
+        "message": "Test notification accepted by Firebase",
+        "provider": "firebase",
     }
 
 
