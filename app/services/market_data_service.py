@@ -103,14 +103,6 @@ def _coingecko_headers() -> dict:
 
 
 
-TWELVE_DATA_URL = (
-
-    "https://api.twelvedata.com/quote"
-
-)
-
-
-
 OILPRICEAPI_URL = (
 
     "https://api.oilpriceapi.com/v1/prices/latest"
@@ -126,14 +118,6 @@ SERVIX_API_URL = (
 )
 
 
-
-
-
-TWELVE_DATA_API_KEY = os.getenv(
-
-    "TWELVE_DATA_API_KEY"
-
-)
 
 
 
@@ -1943,201 +1927,44 @@ def get_herat_gold_price() -> dict:
 
 
 def get_gold_price() -> dict:
+    """
+    Fetch the global XAU/USD spot price from XAUS.
 
+    XAUS is a public JSON endpoint and does not require an API key.
+    The endpoint returns spot_usd_oz as the gold price in USD per
+    troy ounce. During an upstream outage, XAUS may explicitly serve
+    the last known real quote rather than inventing a value.
+    """
+    url = "https://xaus.com/api/v1/spot?compact=1"
+    data = make_request(url)
 
+    if not isinstance(data, dict):
+        raise RuntimeError("XAUS returned an invalid response.")
 
-    if not TWELVE_DATA_API_KEY:
-
-
-
-        raise RuntimeError(
-
-            "TWELVE_DATA_API_KEY is not set."
-
-        )
-
-
-
-    params = {
-
-
-
-        "symbol": GOLD_SYMBOL,
-
-
-
-        "apikey": TWELVE_DATA_API_KEY,
-
-    }
-
-
-
-    query_string = urllib.parse.urlencode(
-
-        params
-
-    )
-
-
-
-    url = (
-
-        f"{TWELVE_DATA_URL}"
-
-        f"?{query_string}"
-
-    )
-
-
-
-    data = make_request(
-
-        url
-
-    )
-
-
-
-    # Twelve Data can return an error
-
-    # inside the JSON response.
-
-
-
-    if data.get("status") == "error":
-
-
-
-        raise RuntimeError(
-
-            data.get(
-
-                "message",
-
-                "Twelve Data returned an error."
-
-            )
-
-        )
-
-
-
-    price = data.get(
-
-        "close"
-
-    )
-
-
-
+    price = data.get("spot_usd_oz")
     if price is None:
-
-
-
+        error_message = data.get("error") or data.get("message")
         raise RuntimeError(
-
-            f"Gold price was not returned: {data}"
-
+            f"XAUS did not return spot_usd_oz. "
+            f"{error_message or data}"
         )
-
-
 
     try:
+        price = float(price)
+    except (TypeError, ValueError):
+        raise RuntimeError(f"Invalid XAUS gold price: {price}")
 
+    if price <= 0:
+        raise RuntimeError(f"XAUS returned a non-positive gold price: {price}")
 
-
-        price = float(
-
-            price
-
-        )
-
-
-
-    except (
-
-        TypeError,
-
-        ValueError
-
-    ):
-
-
-
-        raise RuntimeError(
-
-            f"Invalid gold price: {price}"
-
-        )
-
-
-
-    percent_change = data.get(
-
-        "percent_change",
-
-        0
-
-    )
-
-
-
-    try:
-
-
-
-        percent_change = float(
-
-            percent_change
-
-        )
-
-
-
-    except (
-
-        TypeError,
-
-        ValueError
-
-    ):
-
-
-
-        percent_change = 0
-
-
-
+    # XAUS's spot endpoint does not provide a 24-hour percentage change.
+    # Keep the existing response shape expected by the database/frontend.
     return {
-
-
-
         "price": price,
-
-
-
-        "change_24h": percent_change,
-
-
-
+        "change_24h": 0,
         "volume_24h": None,
-
-
-
         "market_cap": None,
-
     }
-
-
-
-
-
-# =========================================================
-
-# OilPriceAPI helper
-
-# =========================================================
-
 
 
 def get_oil_price_by_code(
@@ -2746,35 +2573,71 @@ def get_servix_fx_data() -> dict:
 
 
 
-   
+    if not isinstance(data, list):
+
+        raise RuntimeError(
+
+            f"Invalid Servix response: {data}"
+
+        )
+
+
+
     result = {}
 
-    if isinstance(data, dict):
-        code = data.get("code")
-        value = data.get("value")
 
-        if code and value is not None:
-            result[code.upper()] = _to_float(value, code)
 
-    elif isinstance(data, list):
-        for item in data:
-            if not isinstance(item, dict):
-                continue
+    for item in data:
 
-            code = item.get("code")
-            value = item.get("value")
 
-            if code and value is not None:
-                result[code.upper()] = _to_float(value, code)
 
-    else:
-        raise RuntimeError(f"Invalid Servix response: {data}")
+        if not isinstance(item, dict):
+
+            continue
+
+
+
+        code = item.get("code")
+
+
+
+        if not code:
+
+            continue
+
+
+
+        value = item.get("value")
+
+
+
+        if value is None:
+
+            continue
+
+
+
+        result[code.upper()] = _to_float(
+
+            value,
+
+            code
+
+        )
+
+
 
     if not result:
-        raise RuntimeError("Servix returned no FX prices.")
+
+        raise RuntimeError(
+
+            "Servix returned no FX prices."
+
+        )
+
+
 
     return result
-
 
 
 
