@@ -176,42 +176,37 @@ IRAN_FX_SYMBOLS = {
 
 def iran_fx_data_is_fresh(db) -> bool:
     """
-    Check whether the complete Iran FX dataset is already
-    available in the database and is less than 2 hours old.
+    Treat the latest successfully saved USD_IRT price as the
+    marker for the last successful Servix FX update.
 
-    If fresh data exists, Servix is not called again.
+    Servix always requires USD_RLS to build USD_IRT. Therefore,
+    a recent USD_IRT database row indicates that the Servix
+    request returned usable data and the save operation reached
+    the database. Missing or older than 2-hour data is stale.
+
+    This avoids depending on every optional FX symbol being
+    present in the response and prevents the updater from
+    remaining stale just because Servix omits one optional pair.
     """
 
-    recent_count = (
-        db.query(
-            func.count(
-                func.distinct(
-                    MarketPrice.asset_id
-                )
-            )
-        )
+    recent_usd_marker = (
+        db.query(MarketPrice.id)
         .join(
             Asset,
             Asset.id == MarketPrice.asset_id
         )
         .filter(
-            Asset.symbol.in_(
-                IRAN_FX_SYMBOLS
-            ),
+            Asset.symbol == "USD_IRT",
             Asset.is_active.is_(True),
             MarketPrice.recorded_at
             >= func.now()
-            - text(
-                "INTERVAL '2 hours'"
-            ),
+            - text("INTERVAL '2 hours'"),
         )
-        .scalar()
+        .order_by(MarketPrice.recorded_at.desc())
+        .first()
     )
 
-    return (
-        (recent_count or 0)
-        >= len(IRAN_FX_SYMBOLS)
-    )
+    return recent_usd_marker is not None
 
 
 # =========================================================
