@@ -59,12 +59,11 @@ def send_verification_email(
     from urllib.parse import quote
 
     encoded_token = quote(verification_token, safe="")
-    verification_url = (
-        "http://remote-respina-free.runflare.com:31496"
-        "/api/auth/open-verification-app"
-        f"?token={encoded_token}"
-    )
-
+   verification_url = (
+    "https://app-6ace1791.deploy.meerasolution.com"
+    "/api/auth/open-verification-app"
+    f"?token={encoded_token}"
+)
     message = MIMEMultipart(
         "alternative"
     )
