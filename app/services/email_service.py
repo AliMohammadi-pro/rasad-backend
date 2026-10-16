@@ -1,5 +1,8 @@
+
 import os
 import smtplib
+
+from urllib.parse import quote
 
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -24,20 +27,14 @@ SMTP_PORT = int(
     )
 )
 
-SMTP_USERNAME = os.getenv(
-    "SMTP_USERNAME"
-)
-
-SMTP_PASSWORD = os.getenv(
-    "SMTP_PASSWORD"
-)
+SMTP_USERNAME = os.getenv("SMTP_USERNAME")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
 EMAIL_FROM = os.getenv(
     "EMAIL_FROM",
     SMTP_USERNAME
 )
 
-# نام نمایشی فرستنده
 EMAIL_FROM_DISPLAY = formataddr(
     (
         str(Header("اپلیکیشن رصد", "utf-8")),
@@ -55,23 +52,22 @@ def send_verification_email(
     verification_token: str
 ) -> None:
 
-    # لینک HTTP قابل کلیک در Gmail؛ این مسیر کاربر را به اپ اندروید هدایت می‌کند.
-    from urllib.parse import quote
-
-    encoded_token = quote(verification_token, safe="")
-   verification_url = (
-    "https://app-6ace1791.deploy.meerasolution.com"
-    "/api/auth/open-verification-app"
-    f"?token={encoded_token}"
-)
-    message = MIMEMultipart(
-        "alternative"
+    encoded_token = quote(
+        verification_token,
+        safe=""
     )
 
-    message["Subject"] = (
-        "تأیید ایمیل حساب رصد"
+    verification_url = (
+        "https://app-6ace1791.deploy.meerasolution.com"
+        "/api/auth/open-verification-app"
+        f"?token={encoded_token}"
     )
 
+    message = MIMEMultipart("alternative")
+
+    message["Subject"] = str(
+        Header("تأیید ایمیل حساب رصد", "utf-8")
+    )
     message["From"] = EMAIL_FROM_DISPLAY
     message["To"] = recipient_email
 
@@ -92,18 +88,16 @@ def send_verification_email(
     html_content = f"""
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
-
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>تأیید ایمیل - رصد</title>
 </head>
-
 <body style="
     font-family: Arial, sans-serif;
     background: #f5f7fb;
     padding: 40px;
 ">
-
 <div style="
     max-width: 600px;
     margin: auto;
@@ -111,11 +105,7 @@ def send_verification_email(
     padding: 30px;
     border-radius: 15px;
 ">
-
-    <h2 style="
-        text-align: center;
-        color: #ff7a18;
-    ">
+    <h2 style="text-align: center; color: #ff7a18;">
         تأیید ایمیل
     </h2>
 
@@ -127,42 +117,29 @@ def send_verification_email(
         روی دکمه زیر کلیک کنید:
     </p>
 
-    <div style="
-        text-align: center;
-        margin: 30px 0;
-    ">
-
+    <div style="text-align: center; margin: 30px 0;">
         <a href="{verification_url}"
            style="
-           background: #ff7a18;
-           color: white;
-           padding: 14px 25px;
-           border-radius: 8px;
-           text-decoration: none;
-           display: inline-block;
+               background: #ff7a18;
+               color: white;
+               padding: 14px 25px;
+               border-radius: 8px;
+               text-decoration: none;
+               display: inline-block;
            ">
-
             تأیید ایمیل
-
         </a>
-
     </div>
 
-    <p>
-        این لینک تا ۳۰ دقیقه معتبر است.
-    </p>
+    <p>این لینک تا ۳۰ دقیقه معتبر است.</p>
 
     <p>
         اگر شما این حساب را ایجاد نکرده‌اید،
         این ایمیل را نادیده بگیرید.
     </p>
 
-    <p>
-        اپلیکیشن رصد
-    </p>
-
+    <p>اپلیکیشن رصد</p>
 </div>
-
 </body>
 </html>
 """
@@ -183,10 +160,7 @@ def send_verification_email(
         )
     )
 
-    # ======================================
     # SMTP - Gmail / STARTTLS
-    # ======================================
-
     with smtplib.SMTP(
         SMTP_HOST,
         SMTP_PORT,
@@ -194,9 +168,7 @@ def send_verification_email(
     ) as server:
 
         server.ehlo()
-
         server.starttls()
-
         server.ehlo()
 
         server.login(
@@ -223,21 +195,23 @@ def send_password_reset_email(
     frontend_url = os.getenv(
         "FRONTEND_URL",
         "http://localhost:5173"
+    ).rstrip("/")
+
+    encoded_token = quote(
+        reset_token,
+        safe=""
     )
 
     reset_url = (
         f"{frontend_url}/reset-password"
-        f"?token={reset_token}"
+        f"?token={encoded_token}"
     )
 
-    message = MIMEMultipart(
-        "alternative"
-    )
+    message = MIMEMultipart("alternative")
 
-    message["Subject"] = (
-        "بازیابی رمز عبور حساب رصد"
+    message["Subject"] = str(
+        Header("بازیابی رمز عبور حساب رصد", "utf-8")
     )
-
     message["From"] = EMAIL_FROM_DISPLAY
     message["To"] = recipient_email
 
@@ -259,18 +233,16 @@ def send_password_reset_email(
     html_content = f"""
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
-
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>بازیابی رمز عبور - رصد</title>
 </head>
-
 <body style="
     font-family: Arial, sans-serif;
     background: #f5f7fb;
     padding: 40px;
 ">
-
 <div style="
     max-width: 600px;
     margin: auto;
@@ -278,11 +250,7 @@ def send_password_reset_email(
     padding: 30px;
     border-radius: 15px;
 ">
-
-    <h2 style="
-        text-align: center;
-        color: #ff7a18;
-    ">
+    <h2 style="text-align: center; color: #ff7a18;">
         بازیابی رمز عبور
     </h2>
 
@@ -294,42 +262,29 @@ def send_password_reset_email(
         روی دکمه زیر کلیک کنید:
     </p>
 
-    <div style="
-        text-align: center;
-        margin: 30px 0;
-    ">
-
+    <div style="text-align: center; margin: 30px 0;">
         <a href="{reset_url}"
            style="
-           background: #ff7a18;
-           color: white;
-           padding: 14px 25px;
-           border-radius: 8px;
-           text-decoration: none;
-           display: inline-block;
+               background: #ff7a18;
+               color: white;
+               padding: 14px 25px;
+               border-radius: 8px;
+               text-decoration: none;
+               display: inline-block;
            ">
-
             تغییر رمز عبور
-
         </a>
-
     </div>
 
-    <p>
-        این لینک تا ۳۰ دقیقه معتبر است.
-    </p>
+    <p>این لینک تا ۳۰ دقیقه معتبر است.</p>
 
     <p>
         اگر شما درخواست بازیابی رمز عبور نداده‌اید،
         این ایمیل را نادیده بگیرید.
     </p>
 
-    <p>
-        اپلیکیشن رصد
-    </p>
-
+    <p>اپلیکیشن رصد</p>
 </div>
-
 </body>
 </html>
 """
@@ -350,10 +305,7 @@ def send_password_reset_email(
         )
     )
 
-    # ======================================
     # SMTP - Gmail / STARTTLS
-    # ======================================
-
     with smtplib.SMTP(
         SMTP_HOST,
         SMTP_PORT,
@@ -361,9 +313,7 @@ def send_password_reset_email(
     ) as server:
 
         server.ehlo()
-
         server.starttls()
-
         server.ehlo()
 
         server.login(
