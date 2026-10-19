@@ -48,7 +48,7 @@ ENERGY_UPDATE_INTERVAL = 60 * 60
 
 # Iran FX
 # Servix policy: maximum once every 2 hours
-IRAN_FX_UPDATE_INTERVAL = 2 * 60 * 60
+IRAN_FX_UPDATE_INTERVAL =  60 * 60
 
 
 # Afghanistan FX

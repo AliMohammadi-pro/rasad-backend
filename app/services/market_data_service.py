@@ -1927,44 +1927,73 @@ def get_herat_gold_price() -> dict:
 
 
 def get_gold_price() -> dict:
+    """Fetch global XAU/USD spot price, trying XAUS first and Gold-API second.
+
+    Both providers return a price in USD per troy ounce. The public
+    Gold-API endpoint does not require an API key. If both sources fail,
+    raise an error so the updater can keep the last saved database price;
+    never manufacture a replacement price.
     """
-    Fetch the global XAU/USD spot price from XAUS.
+    providers = (
+        (
+            "XAUS",
+            "https://xaus.com/api/v1/spot?compact=1",
+            "spot_usd_oz",
+        ),
+        (
+            "Gold-API",
+            "https://api.gold-api.com/price/XAU",
+            "price",
+        ),
+    )
 
-    XAUS is a public JSON endpoint and does not require an API key.
-    The endpoint returns spot_usd_oz as the gold price in USD per
-    troy ounce. During an upstream outage, XAUS may explicitly serve
-    the last known real quote rather than inventing a value.
-    """
-    url = "https://xaus.com/api/v1/spot?compact=1"
-    data = make_request(url)
+    errors = []
 
-    if not isinstance(data, dict):
-        raise RuntimeError("XAUS returned an invalid response.")
+    for provider_name, url, price_field in providers:
+        try:
+            data = make_request(url)
 
-    price = data.get("spot_usd_oz")
-    if price is None:
-        error_message = data.get("error") or data.get("message")
-        raise RuntimeError(
-            f"XAUS did not return spot_usd_oz. "
-            f"{error_message or data}"
-        )
+            if not isinstance(data, dict):
+                raise RuntimeError("provider returned an invalid JSON object")
 
-    try:
-        price = float(price)
-    except (TypeError, ValueError):
-        raise RuntimeError(f"Invalid XAUS gold price: {price}")
+            raw_price = data.get(price_field)
+            if raw_price is None and provider_name == "Gold-API":
+                # Support alternate field names if the provider changes its
+                # response shape, while still requiring a real numeric quote.
+                raw_price = data.get("price_usd") or data.get("spot_usd_oz")
 
-    if price <= 0:
-        raise RuntimeError(f"XAUS returned a non-positive gold price: {price}")
+            if raw_price is None:
+                message = data.get("error") or data.get("message")
+                raise RuntimeError(
+                    f"price field '{price_field}' missing"
+                    + (f": {message}" if message else "")
+                )
 
-    # XAUS's spot endpoint does not provide a 24-hour percentage change.
-    # Keep the existing response shape expected by the database/frontend.
-    return {
-        "price": price,
-        "change_24h": 0,
-        "volume_24h": None,
-        "market_cap": None,
-    }
+            try:
+                price = float(raw_price)
+            except (TypeError, ValueError):
+                raise RuntimeError(f"invalid price value: {raw_price!r}")
+
+            if price <= 0:
+                raise RuntimeError(f"non-positive price: {price}")
+
+            print(f"[Market] Global gold updated via {provider_name}: {price} USD/oz")
+            # Keep the response shape expected by the database and frontend.
+            # Neither endpoint is relied on here for a 24-hour change value.
+            return {
+                "price": price,
+                "change_24h": 0,
+                "volume_24h": None,
+                "market_cap": None,
+            }
+
+        except Exception as error:
+            errors.append(f"{provider_name}: {error}")
+            print(f"[Market] Global gold source {provider_name} failed: {error}")
+
+    raise RuntimeError(
+        "All global gold price sources failed. " + " | ".join(errors)
+    )
 
 
 def get_oil_price_by_code(
