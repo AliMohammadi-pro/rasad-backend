@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from sqlalchemy.orm import Session
 
@@ -4710,62 +4710,28 @@ def save_market_prices(
 
 
 
+            # Read the 24-hour reference from retained candle history,
+            # not MarketPrice snapshots (which are pruned below).
             previous_result = db.execute(
-
-                select(MarketPrice)
-
+                select(MarketCandle)
                 .where(
-
-                    MarketPrice.asset_id == asset.id,
-
-                    MarketPrice.recorded_at <= target_time
-
+                    MarketCandle.asset_id == asset.id,
+                    MarketCandle.interval_minutes == 5,
+                    MarketCandle.recorded_at <= target_time,
                 )
-
-                .order_by(
-
-                    MarketPrice.recorded_at.desc()
-
-                )
-
+                .order_by(MarketCandle.recorded_at.desc())
                 .limit(1)
-
             )
-
-
-
-            previous_price = (
-
-                previous_result.scalars().first()
-
-            )
-
-
+            previous_candle = previous_result.scalars().first()
 
             if (
-
-                previous_price is not None
-
-                and previous_price.price is not None
-
-                and float(previous_price.price) > 0
-
+                previous_candle is not None
+                and previous_candle.close is not None
+                and float(previous_candle.close) > 0
             ):
-
-
-
                 change_24h = (
-
-                    (
-
-                        float(price)
-
-                        - float(previous_price.price)
-
-                    )
-
-                    / float(previous_price.price)
-
+                    (float(price) - float(previous_candle.close))
+                    / float(previous_candle.close)
                 ) * 100
 
 
@@ -4816,11 +4782,14 @@ def save_market_prices(
 
 
 
-        db.add(
-
-            market_price
-
+        # Keep only the latest live snapshot per asset. Historical
+        # chart data remains in MarketCandle and is not deleted.
+        db.execute(
+            delete(MarketPrice).where(
+                MarketPrice.asset_id == asset.id
+            )
         )
+        db.add(market_price)
 
 
 
